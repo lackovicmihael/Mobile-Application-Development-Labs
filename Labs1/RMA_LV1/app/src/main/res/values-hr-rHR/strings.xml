@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tvoj Naziv Aplikacije</string>
+    <string name="hello_miljenko">Pozdrav, Miljenko</string>
+    <string name="your_bmi">Tvoj BMI je: %1$.1f</string>
+    <string name="bmi_low">Prenizak BMI</string>
+    <string name="bmi_ideal">Idealan BMI</string>
+    <string name="bmi_high">Previsok BMI</string>
+</resources>

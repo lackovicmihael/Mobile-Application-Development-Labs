@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">My App Name</string>
+    <string name="hello_miljenko">Hello, Miljenko</string>
+    <string name="your_bmi">Your BMI is: %1$.1f</string>
+    <string name="bmi_low">Underweight BMI</string>
+    <string name="bmi_ideal">Ideal BMI</string>
+    <string name="bmi_high">Overweight BMI</string>
+</resources>
