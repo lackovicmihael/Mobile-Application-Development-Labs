@@ -9,7 +9,7 @@ local.properties
 *.iml
 
 # Firebase & secrets
-app/google-services.json
+Lab2/Predlozak_1/app/google-services.json
 *.jks
 keystore.properties
 *.keystore
