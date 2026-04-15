@@ -1,0 +1,22 @@
+# Android / Gradle
+.gradle
+build/
+*.iml
+local.properties
+
+# Idea
+.idea/
+*.iml
+
+# Firebase & secrets
+app/google-services.json
+*.jks
+keystore.properties
+*.keystore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
