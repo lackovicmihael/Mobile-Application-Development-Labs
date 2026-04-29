@@ -21,10 +21,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.predlozak_1.ui.theme.Predlozak_1Theme
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.google.firebase.firestore.FirebaseFirestore
-import android.util.Log
+import kotlinx.coroutines.tasks.await
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             Predlozak_1Theme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    UserPreview(191, 100, modifier = Modifier.padding(innerPadding))
+                    UserPreview(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
@@ -41,147 +41,198 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun UserPreview(heightCm: Int, weightKg: Int, modifier: Modifier = Modifier) {
-    val heightMeters = heightCm / 100f
-    val initialBmi = weightKg / (heightMeters * heightMeters)
-    val bmiStatus = when {
-        initialBmi < 18.5 -> "Prenizak BMI"
-        initialBmi in 18.5..24.9 -> "Idealan BMI"
-        else -> "Previsok BMI"
-    }
-
-    val scope = rememberCoroutineScope()
+fun UserPreview(modifier: Modifier = Modifier) {
     val db = remember { FirebaseFirestore.getInstance() }
+    val scope = rememberCoroutineScope()
 
-    var newWeightText by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
+    var heightCm by remember { mutableStateOf(0) }
+    var weightKg by remember { mutableStateOf(0) }
+
+    var newWeightInput by remember { mutableStateOf("") }
+    var newHeightInput by remember { mutableStateOf("") }
+
+    var heightError by remember { mutableStateOf(false) }
+    var weightError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
     var progress by remember { mutableStateOf(0f) }
     var newBmiText by remember { mutableStateOf("") }
     var showProgress by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
-    var rezultat by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var saveMessage by remember { mutableStateOf("") }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
+    LaunchedEffect(Unit) {
+        try {
+            val document = db.collection("bmidata").document("main").get().await()
+            if (document.exists()) {
+                heightCm = document.getLong("heightCm")?.toInt() ?: 191
+                weightKg = document.getLong("weightKg")?.toInt() ?: 100
+            }
+        } catch (_: Exception) {}
+    }
+
+    val heightMeters = heightCm / 100f
+    val currentBmi = if (heightMeters > 0) weightKg / (heightMeters * heightMeters) else 0f
+
+    val bmiStatus = when {
+        currentBmi < 18.5 -> "Prenizak BMI"
+        currentBmi in 18.5..24.9 -> "Idealan BMI"
+        else -> "Previsok BMI"
+    }
+
+    Box(modifier = modifier.fillMaxSize().background(Color.White)) {
         Image(
-            painter = painterResource(id = R.drawable.fitness),
-            contentDescription = "Pozadinska slika",
+            painter = painterResource(id = R.drawable.ic_launcher_background),
+            contentDescription = null,
             contentScale = ContentScale.Crop,
             alpha = 0.1f,
             modifier = Modifier.fillMaxSize()
         )
 
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxSize()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(id = R.drawable.profile_pic),
-                    contentDescription = "Profilna slika",
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
+                    contentDescription = "Profil",
+                    modifier = Modifier.size(64.dp).clip(CircleShape)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text(text = "Pozdrav, Miljenko", fontSize = 18.sp)
-                    Text(text = bmiStatus, fontSize = 14.sp, color = Color.Gray)
+                    Text("Pozdrav, Miljenko", fontSize = 18.sp)
+                    Text(bmiStatus, fontSize = 14.sp, color = Color.Gray)
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(text = "Unesi novu težinu (kg):", fontSize = 16.sp)
+            Text("Visina (cm):")
             TextField(
-                value = newWeightText,
-                onValueChange = { newWeightText = it },
+                value = newHeightInput,
+                onValueChange = {
+                    newHeightInput = it
+                    heightError = false
+                    saveMessage = ""
+                },
+                isError = heightError,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (heightError) {
+                Text("Unesite broj za visinu", color = Color.Red)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text("Težina (kg):")
+            TextField(
+                value = newWeightInput,
+                onValueChange = {
+                    newWeightInput = it
+                    weightError = false
+                    saveMessage = ""
+                },
+                isError = weightError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (weightError) {
+                Text("Unesite broj za težinu", color = Color.Red)
+            }
+
+            if (errorMessage.isNotEmpty()) {
+                Text(errorMessage, color = Color.Red)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(onClick = {
-                errorMessage = ""
-                val newTezina = newWeightText.toFloatOrNull()
-                if (newTezina == null) {
-                    errorMessage = "Neispravan unos težine!"
+                val newH = newHeightInput.toIntOrNull()
+                val newW = newWeightInput.toIntOrNull()
+
+                if (newH == null || newW == null) {
+                    heightError = newH == null
+                    weightError = newW == null
+                    errorMessage = "Unesite ispravne vrijednosti!"
+                    saveMessage = ""
+                    return@Button
+                }
+
+                scope.launch {
+                    try {
+                        val newBmi = newW / ((newH / 100f) * (newH / 100f))
+
+                        val data = hashMapOf(
+                            "heightCm" to newH,
+                            "weightKg" to newW,
+                            "bmi" to newBmi
+                        )
+
+                        db.collection("bmidata").document("main").set(data).await()
+
+                        heightCm = newH
+                        weightKg = newW
+
+                        saveMessage = "Podaci uspješno spremljeni!"
+                        errorMessage = ""
+                    } catch (e: Exception) {
+                        saveMessage = "Greška pri spremanju!"
+                    }
+                }
+            }) {
+                Text("Spremi u Firestore")
+            }
+
+            if (saveMessage.isNotEmpty()) {
+                Text(
+                    saveMessage,
+                    color = if (saveMessage.contains("uspješno")) Color.Green else Color.Red
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(onClick = {
+                val newH = newHeightInput.toIntOrNull()
+                val newW = newWeightInput.toIntOrNull()
+
+                if (newH == null || newW == null) {
+                    heightError = newH == null
+                    weightError = newW == null
+                    errorMessage = "Unesite ispravne vrijednosti!"
+                    saveMessage = ""
                     return@Button
                 }
 
                 scope.launch {
                     isLoading = true
-                    delay(1000L)
+                    delay(1000)
 
-                    val newBmi = newTezina / (heightMeters * heightMeters)
+                    val newBmi = newW / ((newH / 100f) * (newH / 100f))
                     val idealBmi = 21.7f
 
                     val progressValue = when {
-                        newBmi > initialBmi -> 0f
+                        newBmi > currentBmi -> 0f
                         newBmi <= idealBmi -> 1f
-                        else -> ((initialBmi - newBmi) / (initialBmi - idealBmi)).coerceIn(0f, 1f)
+                        else -> ((currentBmi - newBmi) / (currentBmi - idealBmi)).coerceIn(0f, 1f)
                     }
 
                     progress = progressValue
                     newBmiText = "Novi BMI: %.1f – Napredak: %.0f%%".format(newBmi, progressValue * 100)
                     showProgress = true
                     isLoading = false
+                    errorMessage = ""
                 }
             }) {
-                Text("Izračunaj napredak prema idealnom BMI-ju")
+                Text("Izračunaj napredak")
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (isLoading) {
-                CircularProgressIndicator()
-            } else if (errorMessage.isNotEmpty()) {
-                Text(text = errorMessage, color = Color.Red)
-            } else if (showProgress) {
-                Text(text = newBmiText, fontSize = 16.sp)
+            if (showProgress) {
                 Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(onClick = {
-                val newTezina = newWeightText.toFloatOrNull()
-                if (newTezina == null) {
-                    errorMessage = "Neispravan unos za Firebase!"
-                    return@Button
-                }
-
-                val docRef = db.collection("BMI").document("cZJRliv3334331y5Aeng")
-                docRef.update("Tezina", newTezina)
-                    .addOnSuccessListener {
-                        rezultat = "Težina uspješno ažurirana u Firebase!"
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("MainActivity", "Error updating Tezina: $e")
-                        rezultat = "Greška: ${e.message}"
-                    }
-            }) {
-                Text("Unesi Tezinu u Firebase")
-            }
-
-            if (rezultat.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = rezultat,
-                    color = if (rezultat.contains("uspješno")) Color.Green else Color.Red
-                )
+                Text(newBmiText)
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             }
         }
     }
